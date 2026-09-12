@@ -25,3 +25,5 @@ Run the project using the scripts or entry points already present in the reposit
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+2026-09-12 maintenance: the LFS guard now checks out one commit because it scans the current index. Git scan errors fail the job instead of appearing to be a successful empty scan. The shared source change is verified in [sourcerepo PR #51](https://github.com/hongyime/sourcerepo/pull/51), with all ten Linux fixtures passing. Existing pointer rejection, opt-out behavior and action references are preserved. This workflow-only change leaves application code and data unchanged. Release requires passing hosted checks, followed by verification of the merged main workflow.
