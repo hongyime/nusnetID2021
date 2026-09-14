@@ -1,1 +1,1 @@
-js2py==0.74
+# The generator now uses the Python standard library only.

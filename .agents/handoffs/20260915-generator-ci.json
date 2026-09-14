@@ -1,0 +1,8 @@
+{
+  "repository": "hongyime/nusnetID2021",
+  "review": "https://github.com/hongyime/nusnetID2021/pull/32",
+  "branch": "fix/lfs-checkout",
+  "changes": ["Import has no generation side effects", "One bounded append pass per selected prefix", "Standard-library checksum preserves the JavaScript reference", "All tracked Python remains linted", "Labeler uses the existing labels configuration"],
+  "preservation": "No retained dataset opened or changed. Tests use only synthetic temporary files. The shared bot merge policy retains its existing gates.",
+  "release_gate": "Validate the combined PR head, including the shallow fail-closed LFS guard, before merging. Verify main workflows afterward. No hosted app is associated with this offline generator."
+}

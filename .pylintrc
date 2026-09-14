@@ -1,0 +1,3 @@
+[BASIC]
+# This shared CLI filename is part of the workflow interface, not a Python import.
+good-names-rgxs=^checked-bot-merge$
