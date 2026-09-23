@@ -18,13 +18,10 @@ BOTS = {
 }
 
 
-def identity_decision(pr, expected_head, allowed):
-    """Reject ineligible ownership, branch, identity or repository merge state."""
-    if (pr.get('state') != 'open' or pr.get('draft')
-            or pr.get('user', {}).get('login') not in allowed):
+def decision(pr, required, checks, expected_head, allowed):
+    if pr.get('state') != 'open' or pr.get('draft') or pr.get('user', {}).get('login') not in allowed:
         return 'not an eligible open bot PR'
-    if (pr.get('head', {}).get('repo', {}).get('full_name')
-            != pr.get('base', {}).get('repo', {}).get('full_name')):
+    if pr.get('head', {}).get('repo', {}).get('full_name') != pr.get('base', {}).get('repo', {}).get('full_name'):
         return 'fork PR requires manual review'
     if pr.get('base', {}).get('ref') != pr.get('base', {}).get('repo', {}).get('default_branch'):
         return 'not targeting the default branch'
@@ -32,29 +29,18 @@ def identity_decision(pr, expected_head, allowed):
         return 'PR head changed'
     if pr.get('mergeable') is not True or pr.get('mergeable_state') != 'clean':
         return 'mergeability or repository rules are not satisfied'
-    return None
-
-
-def decision(pr, required, checks, expected_head, allowed):
-    """Require the same current bot identity and successful checks at both reads."""
-    reason = identity_decision(pr, expected_head, allowed)
-    if reason:
-        return reason
-    if not required or not any(c.get('name') == 'Build' and c.get('workflow') == 'Build Check'
-                               for c in required):
+    if not required or not any(c.get('name') == 'Build' and c.get('workflow') == 'Build Check' for c in required):
         return 'a required Build Check / Build result is missing'
     if any(c.get('bucket') != 'pass' for c in required):
         return 'required checks have not all passed'
     if not checks or any(c.get('bucket') not in {'pass', 'skipping'} for c in checks):
         return 'other checks are unfinished or unsuccessful'
-    if not any(c.get('name') == 'Build' and c.get('workflow') == 'Build Check'
-               and c.get('state') == 'SUCCESS' for c in checks):
+    if not any(c.get('name') == 'Build' and c.get('workflow') == 'Build Check' and c.get('state') == 'SUCCESS' for c in checks):
         return 'the current head has no successful Build Check / Build'
     return None
 
 
 def gh(*args, checks=False):
-    """Read structured CLI output and fail closed on transport or parse errors."""
     result = subprocess.run(['gh', *args], capture_output=True, text=True, timeout=45, check=False)
     # gh pr checks uses 8 for pending and 1 for failed checks. Its JSON is still
     # evaluated below. Missing/malformed output or API failures never pass.
@@ -65,7 +51,6 @@ def gh(*args, checks=False):
 
 
 def inspect_and_merge(repo, number, allowed, event_head=None, dry_run=False):
-    """Recheck the exact PR head immediately before the ordinary merge request."""
     endpoint = f'repos/{repo}/pulls/{number}'
     pr = gh('api', endpoint)
     head = pr['head']['sha']
@@ -73,8 +58,7 @@ def inspect_and_merge(repo, number, allowed, event_head=None, dry_run=False):
     if preliminary != 'a required Build Check / Build result is missing':
         return preliminary
     fields = 'name,bucket,state,workflow'
-    required = gh('pr', 'checks', str(number), '--repo', repo,
-                  '--required', '--json', fields, checks=True)
+    required = gh('pr', 'checks', str(number), '--repo', repo, '--required', '--json', fields, checks=True)
     checks = gh('pr', 'checks', str(number), '--repo', repo, '--json', fields, checks=True)
     reason = decision(pr, required, checks, head, allowed)
     if reason:
@@ -88,13 +72,11 @@ def inspect_and_merge(repo, number, allowed, event_head=None, dry_run=False):
         return 'eligible (dry run; no merge requested)'
     # REST enforces the exact head SHA and normal branch rules. No admin bypass
     # or queued auto-merge; a refusal leaves the PR open.
-    result = gh('api', '--method', 'PUT', f'{endpoint}/merge',
-                '-f', 'merge_method=squash', '-f', f'sha={head}')
+    result = gh('api', '--method', 'PUT', f'{endpoint}/merge', '-f', 'merge_method=squash', '-f', f'sha={head}')
     return 'merged checked head' if result.get('merged') is True else 'merge refused; PR left open'
 
 
 def main():
-    """Inspect only the configured bots and the triggering head when supplied."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--group', choices=BOTS, required=True)
     parser.add_argument('--dry-run', action='store_true')
@@ -106,12 +88,10 @@ def main():
     event_head = event.get('workflow_run', {}).get('head_sha') or event.get('sha')
     pages = gh('api', '--paginate', '--slurp', f'repos/{repo}/pulls?state=open&per_page=100')
     for pr in (pr for page in pages for pr in page):
-        if (pr['user']['login'] not in BOTS[args.group]
-                or (event_head and pr['head']['sha'] != event_head)):
+        if pr['user']['login'] not in BOTS[args.group] or (event_head and pr['head']['sha'] != event_head):
             continue
         try:
-            outcome = inspect_and_merge(repo, pr['number'], BOTS[args.group],
-                                        event_head, args.dry_run)
+            outcome = inspect_and_merge(repo, pr['number'], BOTS[args.group], event_head, args.dry_run)
         except (RuntimeError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
             outcome = 'check lookup failed or returned incomplete data; PR left open'
         print(f"PR #{pr['number']}: {outcome}")
