@@ -32,6 +32,7 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         # .github/scripts/ holds shared CI tooling (e.g. checked-bot-merge.py)
-        # synced from sourcerepo, not application code - excluded from this
-        # app-code style lint like other tooling/vendor dirs.
-        pylint --ignore-paths='^\.github/scripts/' $(git ls-files '*.py')
+        # synced from sourcerepo, not application code. --ignore-paths only
+        # filters pylint's own directory walk, not an explicit file list, so
+        # exclude it from the file list itself before pylint ever sees it.
+        pylint $(git ls-files '*.py' | grep -v '^\.github/scripts/')
